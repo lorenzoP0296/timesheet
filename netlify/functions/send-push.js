@@ -1,9 +1,4 @@
-// netlify/functions/send-push.js
-// Scheduled function — runs every 15 minutes via cron
-// Schedule: "0,15,30,45 * * * *"
-
 const webpush = require('web-push');
-const { getStore } = require('@netlify/blobs');
 
 webpush.setVapidDetails(
   'mailto:timesheet@app.local',
@@ -13,7 +8,6 @@ webpush.setVapidDetails(
 
 function getSlotLabel() {
   const now = new Date();
-  // Use Paris timezone
   const paris = new Intl.DateTimeFormat('fr-FR', {
     timeZone: 'Europe/Paris',
     hour: '2-digit', minute: '2-digit', hour12: false
@@ -30,13 +24,26 @@ function getSlotLabel() {
 
 exports.handler = async () => {
   try {
-    const store = getStore('push-subscriptions');
-    const { blobs } = await store.list();
+    const siteId = process.env.MY_SITE_ID;
+    const token = process.env.NETLIFY_API_TOKEN;
 
-    if (!blobs || blobs.length === 0) {
-      console.log('No subscribers');
-      return { statusCode: 200, body: 'No subscribers' };
+    if (!siteId || !token) {
+      console.error('MY_SITE_ID ou NETLIFY_API_TOKEN manquant');
+      return { statusCode: 500, body: 'Config manquante' };
     }
+
+    const getRes = await fetch(`https://api.netlify.com/api/v1/sites/${siteId}/env/PUSH_SUBSCRIPTIONS`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (!getRes.ok) { console.log('Aucun abonné'); return { statusCode: 200, body: 'No subscribers' }; }
+
+    const data = await getRes.json();
+    const val = data.values?.find(v => v.context === 'production')?.value || data.value || '[]';
+    let subscriptions = [];
+    try { subscriptions = JSON.parse(val); } catch { subscriptions = []; }
+
+    if (!subscriptions.length) { console.log('Aucun abonné'); return { statusCode: 200, body: 'No subscribers' }; }
 
     const label = getSlotLabel();
     const payload = JSON.stringify({
@@ -46,35 +53,36 @@ exports.handler = async () => {
       url: '/'
     });
 
-    const results = await Promise.allSettled(
-      blobs.map(async ({ key }) => {
-        const raw = await store.get(key);
-        if (!raw) return;
-        const sub = JSON.parse(raw);
+    const valid = [];
+    await Promise.allSettled(
+      subscriptions.map(async (sub) => {
         try {
           await webpush.sendNotification(sub, payload);
+          valid.push(sub);
         } catch (err) {
-          // 410 Gone = subscription expired, clean it up
           if (err.statusCode === 410 || err.statusCode === 404) {
-            await store.delete(key);
-            console.log('Removed expired subscription:', key);
+            console.log('Subscription expirée, supprimée');
           } else {
-            throw err;
+            valid.push(sub);
           }
         }
       })
     );
 
-    const sent = results.filter(r => r.status === 'fulfilled').length;
-    console.log(`Sent to ${sent}/${blobs.length} subscribers`);
-    return { statusCode: 200, body: `Sent ${sent}` };
+    if (valid.length !== subscriptions.length) {
+      await fetch(`https://api.netlify.com/api/v1/sites/${siteId}/env/PUSH_SUBSCRIPTIONS`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'PUSH_SUBSCRIPTIONS', values: [{ value: JSON.stringify(valid), context: 'production' }] })
+      });
+    }
+
+    console.log(`Envoyé à ${valid.length}/${subscriptions.length} abonnés`);
+    return { statusCode: 200, body: `Sent ${valid.length}` };
   } catch (err) {
     console.error('send-push error:', err);
     return { statusCode: 500, body: err.message };
   }
 };
 
-// Netlify scheduled function config
-module.exports.config = {
-  schedule: '0,15,30,45 * * * *'
-};
+module.exports.config = { schedule: '0,15,30,45 * * * *' };
