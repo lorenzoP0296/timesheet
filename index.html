@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Timesheet">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <title>Timesheet</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #ffffff; --bg2: #f5f4f1; --bg3: #eeede9;
+      --text: #1a1a18; --text2: #6b6a66; --text3: #9e9d99;
+      --border: rgba(0,0,0,0.1); --border2: rgba(0,0,0,0.18);
+      --radius: 12px; --radius-sm: 8px;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1a18; --bg2: #252523; --bg3: #2f2f2c;
+        --text: #f0efe9; --text2: #a0a09a; --text3: #6b6a66;
+        --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.18);
+      }
+    }
+    html, body { height: 100%; overflow: hidden; font-family: var(--font); background: var(--bg); color: var(--text); -webkit-tap-highlight-color: transparent; }
+    .app { height: 100%; display: flex; flex-direction: column; padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); }
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px; border-bottom: 0.5px solid var(--border); flex-shrink: 0; background: var(--bg); }
+    .topbar-title { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+    .topbar-sub { font-size: 12px; color: var(--text2); margin-top: 1px; }
+    .topbar-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--bg2); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text2); }
+    .topbar-btn svg { width: 20px; height: 20px; stroke-width: 1.75; }
+    .bottom-nav { display: flex; border-top: 0.5px solid var(--border); flex-shrink: 0; background: var(--bg); }
+    .nav-item { flex: 1; padding: 10px 4px 12px; display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: none; cursor: pointer; color: var(--text3); font-size: 10px; font-family: var(--font); transition: color 0.15s; }
+    .nav-item svg { width: 22px; height: 22px; stroke-width: 1.75; }
+    .nav-item.active { color: var(--text); }
+    .content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 16px 24px; }
+    .screen { display: none; padding-top: 16px; }
+    .screen.active { display: block; }
+    .banner { display: flex; align-items: center; gap: 10px; background: #FCEBEB; border: 0.5px solid #F09595; border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 14px; }
+    .banner-text { font-size: 13px; color: #791F1F; line-height: 1.4; }
+    .slot-list { display: flex; flex-direction: column; gap: 8px; }
+    .slot-card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px 14px; cursor: pointer; transition: border-color 0.15s; }
+    .slot-card:active { background: var(--bg2); }
+    .slot-card.missing { background: #FCEBEB; border-color: #F09595; }
+    .slot-time { font-size: 12px; color: var(--text2); font-weight: 500; }
+    .slot-task { font-size: 14px; color: var(--text); margin-top: 4px; line-height: 1.4; }
+    .slot-meta { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .cat-tag { font-size: 11px; padding: 3px 10px; border-radius: 100px; font-weight: 500; }
+    .form-section { margin-bottom: 20px; }
+    .form-label { font-size: 12px; font-weight: 600; color: var(--text2); letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 8px; display: block; }
+    textarea { width: 100%; min-height: 100px; padding: 12px 14px; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-sm); font-size: 15px; line-height: 1.5; color: var(--text); font-family: var(--font); resize: none; -webkit-appearance: none; }
+    textarea:focus { outline: none; border-color: var(--border2); }
+    .cat-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .cat-chip { padding: 8px 16px; border-radius: 100px; font-size: 14px; border: 0.5px solid var(--border2); background: var(--bg2); color: var(--text); cursor: pointer; }
+    .cat-chip.add { color: var(--text2); border-style: dashed; }
+    .impact-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .impact-card { padding: 14px; border-radius: var(--radius); border: 0.5px solid var(--border); background: var(--bg2); cursor: pointer; text-align: center; }
+    .impact-card .impact-icon { font-size: 24px; margin-bottom: 6px; }
+    .impact-card .impact-label { font-size: 13px; color: var(--text2); }
+    .impact-card.sel-high { background: #EAF3DE; border-color: #97C459; }
+    .impact-card.sel-high .impact-label { color: #3B6D11; }
+    .impact-card.sel-low { background: var(--bg3); border-color: var(--border2); }
+    .btn-primary { width: 100%; padding: 14px; border-radius: var(--radius); background: var(--text); color: var(--bg); border: none; font-size: 16px; font-weight: 600; cursor: pointer; font-family: var(--font); }
+    .btn-primary:active { opacity: 0.85; }
+    .btn-secondary { padding: 12px 20px; border-radius: var(--radius); background: var(--bg2); color: var(--text); border: 0.5px solid var(--border); font-size: 15px; cursor: pointer; font-family: var(--font); }
+    .btn-row { display: flex; gap: 10px; margin-top: 16px; }
+    .btn-row .btn-secondary { flex-shrink: 0; }
+    .btn-row .btn-primary { flex: 1; }
+    .stat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 16px; }
+    .stat-card { background: var(--bg2); border-radius: var(--radius-sm); padding: 10px 12px; text-align: center; }
+    .stat-num { font-size: 22px; font-weight: 600; }
+    .stat-lbl { font-size: 10px; color: var(--text2); margin-top: 2px; line-height: 1.3; }
+    .timeline { display: flex; flex-direction: column; gap: 2px; margin-bottom: 20px; }
+    .tl-row { display: flex; align-items: center; gap: 8px; }
+    .tl-time { font-size: 11px; color: var(--text3); width: 40px; flex-shrink: 0; }
+    .tl-bar { flex: 1; min-height: 32px; border-radius: 6px; padding: 5px 10px; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    .tl-cat { font-size: 12px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+    .tl-task { font-size: 11px; opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+    .tl-imp { font-size: 10px; padding: 1px 5px; border-radius: 100px; flex-shrink: 0; }
+    .cat-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .cat-bar-name { font-size: 12px; width: 110px; flex-shrink: 0; }
+    .cat-bar-track { flex: 1; height: 8px; background: var(--bg3); border-radius: 4px; overflow: hidden; }
+    .cat-bar-fill { height: 100%; border-radius: 4px; }
+    .cat-bar-time { font-size: 11px; color: var(--text2); width: 38px; text-align: right; flex-shrink: 0; }
+    .settings-group { margin-bottom: 24px; }
+    .settings-group-title { font-size: 11px; font-weight: 600; color: var(--text2); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px; }
+    .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 0.5px solid var(--border); }
+    .settings-row:last-child { border-bottom: none; }
+    select { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 14px; color: var(--text); font-family: var(--font); -webkit-appearance: none; cursor: pointer; }
+    .notif-card { background: var(--bg2); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; }
+    .notif-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .notif-desc { font-size: 13px; color: var(--text2); line-height: 1.5; margin-bottom: 12px; }
+    .status-ok { font-size: 12px; color: #3B6D11; margin-bottom: 10px; }
+    .status-err { font-size: 12px; color: #A32D2D; margin-bottom: 10px; }
+    .status-neutral { font-size: 12px; color: var(--text2); margin-bottom: 10px; }
+    .cat-settings-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid var(--border); }
+    .cat-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .cat-settings-name { flex: 1; font-size: 14px; }
+    .cat-delete { background: none; border: none; cursor: pointer; color: var(--text3); font-size: 18px; padding: 4px; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: flex-end; justify-content: center; z-index: 200; padding-bottom: var(--safe-bottom); }
+    .modal { background: var(--bg); border-radius: 20px 20px 0 0; padding: 20px 20px calc(20px + var(--safe-bottom)); width: 100%; max-height: 85vh; overflow-y: auto; }
+    .modal-handle { width: 36px; height: 4px; background: var(--border2); border-radius: 2px; margin: 0 auto 16px; }
+    .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 16px; }
+    .modal input[type=text] { width: 100%; padding: 12px 14px; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-sm); font-size: 15px; color: var(--text); font-family: var(--font); margin-bottom: 14px; }
+    .modal input:focus { outline: none; border-color: var(--border2); }
+    .color-picker { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+    .color-dot { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; transition: transform 0.15s; border: 2px solid transparent; }
+    .color-dot.selected { transform: scale(1.2); }
+    .empty-state { text-align: center; padding: 40px 16px; color: var(--text2); }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-title { font-size: 16px; font-weight: 500; color: var(--text); margin-bottom: 6px; }
+    .empty-desc { font-size: 14px; line-height: 1.5; }
+    .section-title { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 10px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title" id="topbar-title">Timesheet</div>
+      <div class="topbar-sub" id="topbar-sub"></div>
+    </div>
+    <button class="topbar-btn" onclick="openAddCurrent()" id="topbar-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+    </button>
+  </div>
+
+  <div class="content">
+    <div class="screen active" id="screen-saisie">
+      <div id="missing-banner"></div>
+      <div class="slot-list" id="slots-list"></div>
+    </div>
+
+    <div class="screen" id="screen-form">
+      <div class="form-section">
+        <label class="form-label">Qu'as-tu fait ?</label>
+        <textarea id="task-input" placeholder="Décris ce que tu as fait pendant ce créneau…"></textarea>
+      </div>
+      <div class="form-section">
+        <label class="form-label">Catégorie</label>
+        <div class="cat-grid" id="form-cats"></div>
+      </div>
+      <div class="form-section">
+        <label class="form-label">Impact</label>
+        <div class="impact-row">
+          <div class="impact-card" id="impact-high" onclick="toggleImpact('high')">
+            <div class="impact-icon">🎯</div>
+            <div class="impact-label">Fort impact</div>
+          </div>
+          <div class="impact-card" id="impact-low" onclick="toggleImpact('low')">
+            <div class="impact-icon">📋</div>
+            <div class="impact-label">Faible impact</div>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="switchTab('saisie')">Annuler</button>
+        <button class="btn-primary" onclick="saveEntry()">Enregistrer</button>
+      </div>
+    </div>
+
+    <div class="screen" id="screen-day">
+      <div class="stat-grid" id="day-stats"></div>
+      <div class="section-title">Timeline</div>
+      <div class="timeline" id="day-timeline"></div>
+      <div class="section-title">Par catégorie</div>
+      <div id="day-cats"></div>
+      <div style="margin-top:20px;">
+        <button class="btn-primary" onclick="exportCSV()">Exporter CSV</button>
+      </div>
+    </div>
+
+    <div class="screen" id="screen-settings">
+      <div class="settings-group">
+        <div class="settings-group-title">Journée</div>
+        <div class="settings-row">
+          <span style="font-size:15px;">Heure de début</span>
+          <select id="start-hour-select" onchange="saveStartHour()"></select>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">Notifications push</div>
+        <div class="notif-card">
+          <div class="notif-title">Rappels toutes les 15 min</div>
+          <div class="notif-desc">Le serveur Netlify t'envoie une notification toutes les 15 min, même quand l'app est fermée.</div>
+          <div id="notif-status"></div>
+          <button class="btn-primary" id="notif-btn" onclick="handleNotifBtn()">Activer</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">Catégories</div>
+        <div id="cat-settings-list"></div>
+        <button class="btn-secondary" style="margin-top:12px;width:100%;" onclick="openNewCatModal(false)">+ Nouvelle catégorie</button>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">Données</div>
+        <div class="settings-row" style="cursor:pointer;" onclick="clearToday()">
+          <span style="font-size:15px;color:#A32D2D;">Effacer les données du jour</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-item active" onclick="switchTab('saisie')" id="nav-saisie">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      Saisie
+    </button>
+    <button class="nav-item" onclick="switchTab('day')" id="nav-day">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Journée
+    </button>
+    <button class="nav-item" onclick="switchTab('settings')" id="nav-settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Réglages
+    </button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-backdrop" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Nouvelle catégorie</div>
+    <input type="text" id="modal-name" placeholder="Nom de la catégorie">
+    <label class="form-label">Couleur</label>
+    <div class="color-picker" id="modal-colors"></div>
+    <button class="btn-primary" onclick="confirmNewCat()">Créer</button>
+  </div>
+</div>
+
+<script>
+// ── VAPID PUBLIC KEY (auto-generated, safe to expose) ──
+const VAPID_PUBLIC_KEY = 'BJFzqc3gxUxA7dz5qp_cLmhgeYupgBiWOjlCrkNBK6v0dR6dH9LbGAJgyVPpKnnm7VmoB-XHCn_LB3IyK-NdGkU';
+
+const COLORS = [
+  {id:'purple', bg:'#EEEDFE', border:'#7F77DD', text:'#3C3489', dot:'#7F77DD'},
+  {id:'teal',   bg:'#E1F5EE', border:'#1D9E75', text:'#085041', dot:'#1D9E75'},
+  {id:'coral',  bg:'#FAECE7', border:'#D85A30', text:'#712B13', dot:'#D85A30'},
+  {id:'blue',   bg:'#E6F1FB', border:'#378ADD', text:'#0C447C', dot:'#378ADD'},
+  {id:'amber',  bg:'#FAEEDA', border:'#BA7517', text:'#633806', dot:'#BA7517'},
+  {id:'pink',   bg:'#FBEAF0', border:'#D4537E', text:'#72243E', dot:'#D4537E'},
+  {id:'green',  bg:'#EAF3DE', border:'#639922', text:'#27500A', dot:'#639922'},
+  {id:'gray',   bg:'#F1EFE8', border:'#888780', text:'#444441', dot:'#888780'},
+];
+
+function loadState() {
+  const todayKey = new Date().toISOString().slice(0,10);
+  const defaults = {
+    categories: [
+      {id:'c1', name:'Direction / Stratégie', colorId:'purple'},
+      {id:'c2', name:'Commercial', colorId:'teal'},
+      {id:'c3', name:'Opérations', colorId:'coral'},
+      {id:'c4', name:'Admin / Finance', colorId:'blue'},
+      {id:'c5', name:'RH', colorId:'amber'},
+    ],
+    startHour: 8,
+    pushSubscribed: false
+  };
+  const saved = JSON.parse(localStorage.getItem('ts_config') || 'null') || defaults;
+  const entries = JSON.parse(localStorage.getItem('ts_entries_' + todayKey) || '{}');
+  return { ...saved, entries, todayKey };
+}
+
+function saveConfig() {
+  localStorage.setItem('ts_config', JSON.stringify({
+    categories: S.categories,
+    startHour: S.startHour,
+    pushSubscribed: S.pushSubscribed
+  }));
+}
+function saveEntries() { localStorage.setItem('ts_entries_' + S.todayKey, JSON.stringify(S.entries)); }
+
+let S = loadState();
+let currentSlot = null, selectedCat = null, selectedImpact = null;
+let newCatColor = COLORS[0], modalFromForm = false;
+
+// ── UTILS ──
+const pad = n => String(n).padStart(2,'0');
+function slotKey(h,m){ return pad(h)+':'+pad(m); }
+function slotLabel(key){ const [h,m]=key.split(':').map(Number),em=m+15,eh=em>=60?h+1:h; return key+' – '+pad(eh%24)+':'+pad(em%60); }
+function getColor(id){ return COLORS.find(c=>c.id===id)||COLORS[7]; }
+function getCat(id){ return S.categories.find(c=>c.id===id); }
+
+function getMissingSlots(){
+  const now=new Date(), h=now.getHours(), m=now.getMinutes(), missing=[];
+  for(let hour=S.startHour; hour<=h; hour++){
+    const end=hour===h?Math.floor(m/15)*15:60;
+    for(let min=0;min<end;min+=15){ const k=slotKey(hour,min); if(!S.entries[k]) missing.push(k); }
+  }
+  return missing;
+}
+
+// ── SCREENS ──
+function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+
+function switchTab(tab){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('nav-'+tab).classList.add('active');
+  const map={saisie:'screen-saisie',day:'screen-day',settings:'screen-settings'};
+  showScreen(map[tab]);
+  document.getElementById('topbar-btn').style.display = tab==='saisie'?'flex':'none';
+  const titles={saisie:'Timesheet',day:'Ma journée',settings:'Réglages'};
+  document.getElementById('topbar-title').textContent=titles[tab];
+  document.getElementById('topbar-sub').textContent=tab==='saisie'?new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'}):'';
+  if(tab==='saisie') renderSaisie();
+  if(tab==='day') renderDay();
+  if(tab==='settings') renderSettings();
+}
+
+// ── SAISIE ──
+function renderSaisie(){
+  const missing=getMissingSlots();
+  const banner=document.getElementById('missing-banner'), list=document.getElementById('slots-list');
+  if(missing.length){
+    banner.innerHTML=`<div style="font-size:20px">⏰</div><div class="banner-text">${missing.length} créneau${missing.length>1?'x':''} à rattraper</div>`;
+    list.innerHTML='';
+    missing.forEach(k=>{
+      const d=document.createElement('div'); d.className='slot-card missing';
+      d.innerHTML=`<div class="slot-time">${slotLabel(k)}</div><div class="slot-task" style="color:#A32D2D;font-size:13px;">Non renseigné — appuie pour compléter</div>`;
+      d.onclick=()=>openForm(k,false); list.appendChild(d);
+    });
+  } else {
+    banner.innerHTML='';
+    const keys=Object.keys(S.entries).sort().reverse().slice(0,8);
+    if(!keys.length){ list.innerHTML=`<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">Aucun créneau saisi</div><div class="empty-desc">Appuie sur l'horloge en haut à droite pour commencer.</div></div>`; return; }
+    list.innerHTML='';
+    keys.forEach(k=>{
+      const e=S.entries[k], cat=e.catId?getCat(e.catId):null, col=cat?getColor(cat.colorId):null;
+      const d=document.createElement('div'); d.className='slot-card';
+      d.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;"><div class="slot-time">${slotLabel(k)}</div>${e.impact?`<span style="font-size:11px;padding:3px 8px;border-radius:100px;${e.impact==='high'?'background:#EAF3DE;color:#3B6D11':'background:#F1EFE8;color:#5F5E5A'}">${e.impact==='high'?'🎯 Fort':'📋 Faible'}</span>`:''}</div><div class="slot-task">${e.task||'—'}</div>${cat?`<div class="slot-meta"><span class="cat-tag" style="background:${col.bg};color:${col.text};border:0.5px solid ${col.border}">${cat.name}</span></div>`:''}`;
+      d.onclick=()=>openForm(k,true); list.appendChild(d);
+    });
+  }
+}
+
+function openAddCurrent(){ const missing=getMissingSlots(), now=new Date(); const k=missing.length?missing[0]:slotKey(now.getHours(),Math.floor(now.getMinutes()/15)*15); openForm(k,!!S.entries[k]); }
+
+function openForm(key, isEdit){
+  currentSlot=key; const e=S.entries[key]||{};
+  selectedCat=e.catId||null; selectedImpact=e.impact||null;
+  document.getElementById('task-input').value=e.task||'';
+  document.getElementById('topbar-title').textContent=slotLabel(key);
+  document.getElementById('topbar-sub').textContent=isEdit?'Modifier':'Nouveau créneau';
+  document.getElementById('topbar-btn').style.display='none';
+  renderFormCats(); renderImpact(); showScreen('screen-form');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  setTimeout(()=>document.getElementById('task-input').focus(),100);
+}
+
+function renderFormCats(){
+  const grid=document.getElementById('form-cats'); grid.innerHTML='';
+  S.categories.forEach(cat=>{
+    const col=getColor(cat.colorId), chip=document.createElement('div');
+    chip.className='cat-chip'+(selectedCat===cat.id?' selected':'');
+    if(selectedCat===cat.id) chip.style.cssText=`background:${col.bg};color:${col.text};border-color:${col.border};border-width:1.5px;`;
+    chip.textContent=cat.name;
+    chip.onclick=()=>{ selectedCat=selectedCat===cat.id?null:cat.id; renderFormCats(); };
+    grid.appendChild(chip);
+  });
+  const add=document.createElement('div'); add.className='cat-chip add'; add.textContent='+ Nouvelle';
+  add.onclick=()=>openNewCatModal(true); grid.appendChild(add);
+}
+
+function renderImpact(){
+  document.getElementById('impact-high').className='impact-card'+(selectedImpact==='high'?' sel-high':'');
+  document.getElementById('impact-low').className='impact-card'+(selectedImpact==='low'?' sel-low':'');
+}
+function toggleImpact(v){ selectedImpact=selectedImpact===v?null:v; renderImpact(); }
+
+function saveEntry(){
+  const task=document.getElementById('task-input').value.trim();
+  if(!task){ document.getElementById('task-input').focus(); return; }
+  S.entries[currentSlot]={task,catId:selectedCat,impact:selectedImpact}; saveEntries();
+  const missing=getMissingSlots();
+  if(missing.length) openForm(missing[0],false);
+  else switchTab('saisie');
+}
+
+// ── JOURNÉE ──
+function renderDay(){
+  const keys=Object.keys(S.entries).sort(), total=keys.length;
+  const high=keys.filter(k=>S.entries[k].impact==='high').length;
+  const catCount={};
+  keys.forEach(k=>{ const c=S.entries[k].catId; if(c) catCount[c]=(catCount[c]||0)+1; });
+  document.getElementById('day-stats').innerHTML=`<div class="stat-card"><div class="stat-num">${total}</div><div class="stat-lbl">Créneaux saisis</div></div><div class="stat-card"><div class="stat-num">${(total*15/60).toFixed(1)}h</div><div class="stat-lbl">Tracké</div></div><div class="stat-card"><div class="stat-num">${total?Math.round(high/total*100):0}%</div><div class="stat-lbl">Fort impact</div></div>`;
+  const tl=document.getElementById('day-timeline');
+  if(!keys.length){ tl.innerHTML='<div class="empty-state"><div class="empty-desc">Aucune saisie aujourd\'hui.</div></div>'; }
+  else {
+    tl.innerHTML='';
+    keys.forEach(k=>{
+      const e=S.entries[k], cat=e.catId?getCat(e.catId):null, col=cat?getColor(cat.colorId):null;
+      const row=document.createElement('div'); row.className='tl-row';
+      row.innerHTML=`<div class="tl-time">${k}</div><div class="tl-bar" style="${col?`background:${col.bg};border:0.5px solid ${col.border}`:'background:var(--bg2)'}" onclick="openForm('${k}',true)"><span class="tl-cat" style="${col?`color:${col.text}`:'color:var(--text2)'}">${cat?cat.name:'—'}</span><span class="tl-task" style="${col?`color:${col.text}`:'color:var(--text2)'}">${e.task}</span>${e.impact?`<span class="tl-imp" style="${e.impact==='high'?'background:#C0DD97;color:#27500A':'background:#D3D1C7;color:#444441'}">${e.impact==='high'?'↑':'–'}</span>`:''}</div>`;
+      tl.appendChild(row);
+    });
+  }
+  const catsDiv=document.getElementById('day-cats');
+  const sorted=Object.keys(catCount).sort((a,b)=>catCount[b]-catCount[a]);
+  if(!sorted.length){ catsDiv.innerHTML='<div style="font-size:13px;color:var(--text2);">Aucune catégorie renseignée.</div>'; return; }
+  catsDiv.innerHTML='';
+  sorted.forEach(cid=>{
+    const cat=getCat(cid), col=cat?getColor(cat.colorId):COLORS[7], pct=Math.round(catCount[cid]/total*100);
+    const row=document.createElement('div'); row.className='cat-bar-row';
+    row.innerHTML=`<div class="cat-bar-name" style="color:${col.text}">${cat?cat.name:'?'}</div><div class="cat-bar-track"><div class="cat-bar-fill" style="width:${pct}%;background:${col.border}"></div></div><div class="cat-bar-time">${catCount[cid]*15}min</div>`;
+    catsDiv.appendChild(row);
+  });
+}
+
+function exportCSV(){
+  const keys=Object.keys(S.entries).sort(); let csv='Créneau,Tâche,Catégorie,Impact\n';
+  keys.forEach(k=>{ const e=S.entries[k], cat=e.catId?getCat(e.catId):null; csv+=`"${slotLabel(k)}","${(e.task||'').replace(/"/g,'""')}","${cat?cat.name:''}","${e.impact||''}"\n`; });
+  const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download=`timesheet_${S.todayKey}.csv`; a.click();
+}
+
+// ── SETTINGS ──
+function renderSettings(){
+  const sel=document.getElementById('start-hour-select'); sel.innerHTML='';
+  for(let h=0;h<=12;h++){ const opt=document.createElement('option'); opt.value=h; opt.textContent=pad(h)+'h00'; if(h===S.startHour) opt.selected=true; sel.appendChild(opt); }
+
+  updateNotifUI();
+
+  const catList=document.getElementById('cat-settings-list'); catList.innerHTML='';
+  S.categories.forEach(cat=>{
+    const col=getColor(cat.colorId), row=document.createElement('div'); row.className='cat-settings-row';
+    row.innerHTML=`<div class="cat-dot" style="background:${col.dot}"></div><div class="cat-settings-name">${cat.name}</div><button class="cat-delete" onclick="deleteCat('${cat.id}')">✕</button>`;
+    catList.appendChild(row);
+  });
+}
+
+function saveStartHour(){ S.startHour=parseInt(document.getElementById('start-hour-select').value); saveConfig(); }
+
+function updateNotifUI(){
+  const statusEl=document.getElementById('notif-status'), btn=document.getElementById('notif-btn');
+  const perm=('Notification' in window)?Notification.permission:'unsupported';
+  if(perm==='unsupported'){ statusEl.className='status-err'; statusEl.textContent='Notifications non supportées par ce navigateur.'; btn.style.display='none'; return; }
+  if(perm==='denied'){ statusEl.className='status-err'; statusEl.textContent='Bloquées — autorise les notifications dans les réglages Android.'; btn.style.display='none'; return; }
+  if(S.pushSubscribed && perm==='granted'){ statusEl.className='status-ok'; statusEl.textContent='✓ Notifications actives — tu recevras un push toutes les 15 min.'; btn.textContent='Désactiver'; return; }
+  statusEl.className='status-neutral'; statusEl.textContent='Non activées.'; btn.textContent='Activer les notifications'; btn.style.display='block';
+}
+
+async function handleNotifBtn(){
+  if(S.pushSubscribed){ await unsubscribePush(); return; }
+  await subscribePush();
+}
+
+function urlBase64ToUint8Array(base64String){
+  const padding='='.repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(base64); const arr=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) arr[i]=raw.charCodeAt(i);
+  return arr;
+}
+
+async function subscribePush(){
+  try {
+    if(!('serviceWorker' in navigator && 'PushManager' in window)){ alert('Push non supporté sur ce navigateur.'); return; }
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){ updateNotifUI(); return; }
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY) });
+    const res=await fetch('/.netlify/functions/subscribe',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({subscription:sub}) });
+    if(res.ok){ S.pushSubscribed=true; saveConfig(); updateNotifUI(); }
+    else alert('Erreur serveur lors de l\'inscription.');
+  } catch(err){ console.error(err); alert('Erreur : '+err.message); }
+}
+
+async function unsubscribePush(){
+  try {
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    if(sub){
+      await fetch('/.netlify/functions/subscribe',{ method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({endpoint:sub.endpoint}) });
+      await sub.unsubscribe();
+    }
+    S.pushSubscribed=false; saveConfig(); updateNotifUI();
+  } catch(err){ console.error(err); }
+}
+
+function deleteCat(id){ S.categories=S.categories.filter(c=>c.id!==id); saveConfig(); renderSettings(); }
+function clearToday(){ if(confirm('Effacer toutes les saisies du jour ?')){ S.entries={}; saveEntries(); renderSaisie(); } }
+
+// ── MODAL ──
+function openNewCatModal(fromForm=false){
+  modalFromForm=fromForm; newCatColor=COLORS[0];
+  document.getElementById('modal-name').value='';
+  const cp=document.getElementById('modal-colors'); cp.innerHTML='';
+  COLORS.forEach((c,i)=>{
+    const dot=document.createElement('div'); dot.className='color-dot'+(i===0?' selected':'');
+    dot.style.cssText=`background:${c.dot};border-color:${i===0?c.text:'transparent'}`;
+    dot.onclick=()=>{ newCatColor=c; cp.querySelectorAll('.color-dot').forEach((d,j)=>{ d.className='color-dot'+(j===i?' selected':''); d.style.borderColor=j===i?COLORS[j].text:'transparent'; }); };
+    cp.appendChild(dot);
+  });
+  document.getElementById('modal-backdrop').style.display='flex';
+  setTimeout(()=>document.getElementById('modal-name').focus(),100);
+}
+function closeModal(){ document.getElementById('modal-backdrop').style.display='none'; }
+function confirmNewCat(){
+  const name=document.getElementById('modal-name').value.trim(); if(!name) return;
+  const newCat={id:'c'+Date.now(),name,colorId:newCatColor.id};
+  S.categories.push(newCat); saveConfig(); closeModal();
+  if(modalFromForm){ selectedCat=newCat.id; renderFormCats(); } else renderSettings();
+}
+
+// ── SERVICE WORKER ──
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').then(()=>console.log('SW registered'));
+}
+
+// ── INIT ──
+document.getElementById('topbar-sub').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+renderSaisie();
+</script>
+</body>
+</html>
